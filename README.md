@@ -140,6 +140,36 @@ python tikfetch.py
 
 ---
 
+## 🌍 Bypassing ISP Blocks (e.g., in India)
+
+TikTok is banned in several countries (like India), meaning ISPs block access to `tiktok.com`. If you try to run TikFetch from these regions, the connection will time out. 
+
+To use TikFetch in these countries, you have two options:
+
+### Option 1: Use a Free System-Wide VPN (Recommended & Easiest)
+Turn on a VPN on your computer before running the script.
+- **Cloudflare WARP (1.1.1.1):** Completely free and very fast. [Download here](https://1.1.1.1/).
+- **ProtonVPN:** Has a generous free tier.
+
+*Just turn the VPN on, run `./run.sh`, and TikFetch will work normally!*
+
+### Option 2: Use Proxy settings directly
+You can configure a proxy environment variable before running the script in your terminal:
+
+```bash
+# For Linux / macOS
+export HTTP_PROXY="http://your.proxy.ip:port"
+export HTTPS_PROXY="http://your.proxy.ip:port"
+./run.sh
+
+# For Windows (Command Prompt)
+set HTTP_PROXY=http://your.proxy.ip:port
+set HTTPS_PROXY=http://your.proxy.ip:port
+run.bat
+```
+
+---
+
 ## 📄 License
 
 TikFetch is released under the **GNU General Public License v3.0 (GPLv3)**.  
