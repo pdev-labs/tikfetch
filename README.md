@@ -168,6 +168,13 @@ set HTTPS_PROXY=http://your.proxy.ip:port
 run.bat
 ```
 
+### Option 3: Use a Free Cloud RDP (No VPN required)
+If you don't want to install a VPN or mess with proxies locally, you can create a completely free remote Windows desktop hosted on GitHub's USA servers. 
+
+Check out this repository: **[Free-Github-Actions-RDP-for-App-Testing](https://github.com/pdev-labs/Free-Github-Actions-RDP-for-App-Testing)**
+
+By following the instructions there, you'll get a free Windows RDP instance. Since it's hosted in the US, TikTok is unblocked natively! You can just download TikFetch on that remote desktop and run it effortlessly.
+
 ---
 
 ## 📄 License
