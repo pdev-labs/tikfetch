@@ -9,7 +9,7 @@ Download any TikTok video — or every video from an entire account — in secon
 [![Python](https://img.shields.io/badge/Python-3.8%2B-blue?logo=python&logoColor=white)](https://python.org)
 [![yt-dlp](https://img.shields.io/badge/Powered%20by-yt--dlp-red?logo=youtube)](https://github.com/yt-dlp/yt-dlp)
 [![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows%20%7C%20macOS-lightgrey)](#)
-[![License](https://img.shields.io/badge/License-Personal%20Use-orange)](#license)
+[![License](https://img.shields.io/badge/License-GPLv3-orange)](#license)
 
 </div>
 
@@ -142,5 +142,8 @@ python tikfetch.py
 
 ## 📄 License
 
-TikFetch is provided for **educational and personal use only**.  
+TikFetch is released under the **GNU General Public License v3.0 (GPLv3)**.  
+See the [LICENSE](LICENSE) file for more details.
+
+Please note that this tool is provided for educational and personal use only.  
 Always respect creators' rights and TikTok's Terms of Service.

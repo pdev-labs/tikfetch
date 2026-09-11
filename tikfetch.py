@@ -64,6 +64,17 @@ CONFIG_FILE   = Path.home() / ".tiktok_downloader_config.json"
 DEFAULT_DIR   = Path.home() / "TikTok Downloads"
 TIKTOK_BASE   = "https://www.tiktok.com/@"
 
+# Browser-like headers to prevent TikTok from redirecting to /foryou
+BROWSER_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/125.0.0.0 Safari/537.36"
+    ),
+    "Accept-Language": "en-US,en;q=0.9",
+    "Referer": "https://www.tiktok.com/",
+}
+
 # ── Config helpers ────────────────────────────────────────────────────────────
 def load_config() -> dict:
     if CONFIG_FILE.exists():
@@ -279,6 +290,45 @@ def download_single_video(cfg: dict):
     _show_open_folder_hint(out_dir)
 
 # ── Bulk account download ─────────────────────────────────────────────────────
+def _get_cookie_opts(cfg: dict) -> dict:
+    """
+    Ask the user if they want to supply browser cookies (helps bypass TikTok
+    bot detection). Returns extra yt-dlp opts dict.
+    """
+    browser_map = {
+        "1": "chrome",
+        "2": "firefox",
+        "3": "edge",
+        "4": "safari",
+        "5": None,   # skip
+    }
+    console.print()
+    console.print(
+        Panel(
+            "[yellow]TikTok may block automated requests.\n"
+            "Providing your browser cookies greatly improves reliability.[/yellow]\n\n"
+            "  [cyan]1[/cyan]  Chrome\n"
+            "  [cyan]2[/cyan]  Firefox\n"
+            "  [cyan]3[/cyan]  Edge\n"
+            "  [cyan]4[/cyan]  Safari\n"
+            "  [cyan]5[/cyan]  Skip (no cookies — may fail on some accounts)",
+            title="[bold]🍪 Cookie Source[/bold]",
+            border_style="cyan",
+            padding=(1, 3),
+        )
+    )
+    choice = Prompt.ask(
+        "  [bold]Select browser to extract cookies from[/bold]",
+        choices=["1", "2", "3", "4", "5"],
+        default="5",
+    )
+    browser = browser_map[choice]
+    if browser:
+        info(f"Will extract cookies from [bold cyan]{browser.title()}[/bold cyan]")
+        return {"cookiesfrombrowser": (browser, None, None, None)}
+    return {}
+
+
 def download_account_videos(cfg: dict):
     print_header("Download All Videos from Account")
 
@@ -296,7 +346,9 @@ def download_account_videos(cfg: dict):
         error("No username entered.")
         return
 
-    account_url = f"{TIKTOK_BASE}{username}/video"
+    # Use @username (not @username/video) — the /video suffix causes TikTok
+    # to redirect to /foryou when no session is present.
+    account_url = f"{TIKTOK_BASE}{username}"
     info(f"Target: [bold cyan]{account_url}[/bold cyan]")
 
     out_dir    = choose_output_dir(cfg)
@@ -304,37 +356,77 @@ def download_account_videos(cfg: dict):
     skip_exist = Confirm.ask(
         "  [bold]Skip already downloaded videos?[/bold]", default=True
     )
+
+    # Ask for cookie source — significantly improves TikTok reliability
+    cookie_opts = _get_cookie_opts(cfg)
     console.print()
 
-    # First, count videos
+    # ── Fetch video list ──────────────────────────────────────────────────────
     console.print("  [dim]Fetching video list (this may take a moment)…[/dim]")
 
-    flat_opts = {
-        "quiet":          True,
-        "no_warnings":    True,
-        "extract_flat":   "in_playlist",
-        "skip_download":  True,
-        "ignoreerrors":   True,
+    flat_opts: dict = {
+        "quiet":         True,
+        "no_warnings":   True,
+        "extract_flat":  "in_playlist",
+        "skip_download": True,
+        "ignoreerrors":  True,
+        "http_headers":  BROWSER_HEADERS,
+        "extractor_args": {
+            "tiktok": {"webpage_download": ["1"]},
+        },
     }
+    flat_opts.update(cookie_opts)
 
-    video_urls = []
+    video_urls: list[str] = []
     try:
         with yt_dlp.YoutubeDL(flat_opts) as ydl:
             info_dict = ydl.extract_info(account_url, download=False)
+
+            # Guard against /foryou redirect (TikTok bot detection)
+            if info_dict:
+                page_url = info_dict.get("webpage_url", "") or info_dict.get("url", "")
+                if "foryou" in page_url or info_dict.get("id") == "foryou":
+                    console.print()
+                    error("TikTok redirected to the 'For You' page — bot detection triggered.")
+                    console.print(
+                        Panel(
+                            "[yellow]TikTok blocked the request.[/yellow]\n\n"
+                            "To fix this, re-run and choose a [bold]browser cookie source[/bold]\n"
+                            "when prompted. This lets TikFetch use your logged-in session.\n\n"
+                            "Other options:\n"
+                            "  • Make sure you are [bold]logged in to TikTok[/bold] in that browser first\n"
+                            "  • Try a different browser\n"
+                            "  • Use a VPN and try again\n"
+                            "  • Update yt-dlp: [bold cyan]pip install -U yt-dlp[/bold cyan]",
+                            title="[bold red]⚠ Bot Detection[/bold red]",
+                            border_style="red",
+                            padding=(1, 3),
+                        )
+                    )
+                    return
+
             if info_dict and "entries" in info_dict:
-                video_urls = [
-                    e["url"] if e.get("url", "").startswith("http") else f"https://www.tiktok.com/@{username}/video/{e.get('id', '')}"
-                    for e in info_dict["entries"]
-                    if e
-                ]
+                for e in info_dict["entries"]:
+                    if not e:
+                        continue
+                    vid_id  = e.get("id", "")
+                    vid_url = e.get("url") or e.get("webpage_url") or ""
+                    # Rebuild a proper watch URL if only an ID or short path came back
+                    if not vid_url.startswith("http"):
+                        vid_url = f"https://www.tiktok.com/@{username}/video/{vid_id}"
+                    video_urls.append(vid_url)
+
     except Exception as e:
+        console.print()
         error(f"Could not fetch video list: {escape(str(e))}")
         _print_troubleshoot()
         return
 
     if not video_urls:
+        console.print()
         warn("No public videos found for this account.")
         warn("The account may be private, empty, or the username may be incorrect.")
+        warn("Try running again and selecting a browser cookie source when prompted.")
         return
 
     console.print()
@@ -352,6 +444,7 @@ def download_account_videos(cfg: dict):
     user_dir.mkdir(parents=True, exist_ok=True)
 
     ydl_opts = _build_ydl_opts(user_dir, watermark=watermark, skip_existing=skip_exist)
+    ydl_opts.update(cookie_opts)
 
     downloaded = 0
     skipped    = 0
@@ -374,12 +467,8 @@ def download_account_videos(cfg: dict):
 
         def _hook(d: dict):
             status = d.get("status")
-            if status == "downloading":
+            if status in ("downloading", "finished"):
                 hook_obj.hook(d)
-            elif status == "finished":
-                hook_obj.hook(d)
-            elif status == "error":
-                pass
 
         ydl_opts["progress_hooks"] = [_hook]
 
@@ -419,12 +508,16 @@ def _build_ydl_opts(out_dir: Path, watermark: bool = False, skip_existing: bool 
         "nooverwrites":   skip_existing,
         "continuedl":     True,
         "merge_output_format": "mp4",
+        "http_headers":   BROWSER_HEADERS,
         "postprocessors": [
             {
                 "key": "FFmpegVideoConvertor",
                 "preferedformat": "mp4",
             }
         ],
+        "extractor_args": {
+            "tiktok": {"webpage_download": ["1"]},
+        },
     }
 
     if watermark:
@@ -473,6 +566,8 @@ def _print_troubleshoot():
         Panel(
             "[yellow]Troubleshooting tips:[/yellow]\n"
             "  • Make sure the video/account is [bold]public[/bold].\n"
+            "  • Run again and select a [bold]browser cookie source[/bold] when prompted.\n"
+            "  • Make sure you are logged in to TikTok in that browser first.\n"
             "  • Try updating yt-dlp: [bold cyan]pip install -U yt-dlp[/bold cyan]\n"
             "  • Some regions block TikTok — try using a VPN.\n"
             "  • TikTok may have changed its API. Check yt-dlp GitHub for updates.",
