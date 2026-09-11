@@ -26,6 +26,10 @@ def check_and_install_deps():
         import rich  # noqa: F401
     except ImportError:
         missing.append("rich")
+    try:
+        import playwright  # noqa: F401
+    except ImportError:
+        missing.append("playwright")
 
     if missing:
         print(f"\n[INFO] Installing missing packages: {', '.join(missing)} ...")
@@ -38,6 +42,7 @@ check_and_install_deps()
 
 # ── Imports (after install) ───────────────────────────────────────────────────
 import yt_dlp
+from playwright.sync_api import sync_playwright
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Prompt, Confirm
@@ -328,6 +333,63 @@ def _get_cookie_opts(cfg: dict) -> dict:
         return {"cookiesfrombrowser": (browser, None, None, None)}
     return {}
 
+def _fetch_videos_with_playwright(account_url: str, headless: bool = True) -> list[str]:
+    """
+    Uses Playwright to open the TikTok profile, scroll down, and extract video URLs.
+    """
+    video_urls = []
+    
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=headless)
+        context = browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+            viewport={"width": 1280, "height": 800},
+            locale="en-US"
+        )
+        page = context.new_page()
+        
+        # Navigate and wait for content
+        page.goto(account_url, wait_until="networkidle")
+        
+        # Check if redirected to /foryou
+        if "foryou" in page.url:
+            browser.close()
+            raise Exception("TikTok redirected to 'For You' page. Bot detection triggered.")
+        
+        # Scroll down repeatedly to load videos
+        previous_count = 0
+        max_scrolls = 50 # Prevent infinite loop
+        
+        for _ in range(max_scrolls):
+            # Find all video links
+            links = page.locator("a[href*='/video/']").all()
+            current_count = len(links)
+            
+            if current_count > previous_count:
+                previous_count = current_count
+            else:
+                # Try to scroll a bit more and wait to see if more load
+                page.evaluate("window.scrollBy(0, 2000)")
+                page.wait_for_timeout(2000)
+                links = page.locator("a[href*='/video/']").all()
+                if len(links) == current_count:
+                    break # No more videos loaded
+            
+            # Scroll to the bottom
+            page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            page.wait_for_timeout(2000) # Wait for network requests
+            
+        # Extract hrefs
+        links = page.locator("a[href*='/video/']").all()
+        for link in links:
+            href = link.get_attribute("href")
+            if href and href not in video_urls:
+                video_urls.append(href)
+                
+        browser.close()
+        
+    return video_urls
+
 
 def download_account_videos(cfg: dict):
     print_header("Download All Videos from Account")
@@ -361,61 +423,16 @@ def download_account_videos(cfg: dict):
     cookie_opts = _get_cookie_opts(cfg)
     console.print()
 
+    show_browser = Confirm.ask(
+        "  [bold]Show automated browser?[/bold] [dim](Say yes if headless gets blocked)[/dim]", default=False
+    )
+    
     # ── Fetch video list ──────────────────────────────────────────────────────
-    console.print("  [dim]Fetching video list (this may take a moment)…[/dim]")
-
-    flat_opts: dict = {
-        "quiet":         True,
-        "no_warnings":   True,
-        "extract_flat":  "in_playlist",
-        "skip_download": True,
-        "ignoreerrors":  True,
-        "http_headers":  BROWSER_HEADERS,
-        "extractor_args": {
-            "tiktok": {"webpage_download": ["1"]},
-        },
-    }
-    flat_opts.update(cookie_opts)
-
+    console.print("  [dim]Fetching video list using automated browser (this may take a moment)…[/dim]")
+    
     video_urls: list[str] = []
     try:
-        with yt_dlp.YoutubeDL(flat_opts) as ydl:
-            info_dict = ydl.extract_info(account_url, download=False)
-
-            # Guard against /foryou redirect (TikTok bot detection)
-            if info_dict:
-                page_url = info_dict.get("webpage_url", "") or info_dict.get("url", "")
-                if "foryou" in page_url or info_dict.get("id") == "foryou":
-                    console.print()
-                    error("TikTok redirected to the 'For You' page — bot detection triggered.")
-                    console.print(
-                        Panel(
-                            "[yellow]TikTok blocked the request.[/yellow]\n\n"
-                            "To fix this, re-run and choose a [bold]browser cookie source[/bold]\n"
-                            "when prompted. This lets TikFetch use your logged-in session.\n\n"
-                            "Other options:\n"
-                            "  • Make sure you are [bold]logged in to TikTok[/bold] in that browser first\n"
-                            "  • Try a different browser\n"
-                            "  • Use a VPN and try again\n"
-                            "  • Update yt-dlp: [bold cyan]pip install -U yt-dlp[/bold cyan]",
-                            title="[bold red]⚠ Bot Detection[/bold red]",
-                            border_style="red",
-                            padding=(1, 3),
-                        )
-                    )
-                    return
-
-            if info_dict and "entries" in info_dict:
-                for e in info_dict["entries"]:
-                    if not e:
-                        continue
-                    vid_id  = e.get("id", "")
-                    vid_url = e.get("url") or e.get("webpage_url") or ""
-                    # Rebuild a proper watch URL if only an ID or short path came back
-                    if not vid_url.startswith("http"):
-                        vid_url = f"https://www.tiktok.com/@{username}/video/{vid_id}"
-                    video_urls.append(vid_url)
-
+        video_urls = _fetch_videos_with_playwright(account_url, headless=not show_browser)
     except Exception as e:
         console.print()
         error(f"Could not fetch video list: {escape(str(e))}")

@@ -58,8 +58,11 @@ if [ -f "$REQ_FILE" ]; then
     success "Dependencies ready."
 else
     warn "requirements.txt not found — installing core deps directly."
-    "$PYTHON" -m pip install --quiet --upgrade yt-dlp rich
+    "$PYTHON" -m pip install --quiet --upgrade yt-dlp rich playwright
 fi
+
+info "Installing browser binaries for Playwright..."
+"$PYTHON" -m playwright install --with-deps chromium
 
 # ── Also check ffmpeg ─────────────────────────────────────
 if ! command -v ffmpeg &>/dev/null; then
