@@ -65,7 +65,7 @@ if exist "!REQ_FILE!" (
 echo [OK]   Dependencies ready.
 
 echo [INFO] Installing browser binaries for Playwright...
-"!PYTHON!" -m playwright install --with-deps chromium
+"!PYTHON!" -m playwright install chromium
 
 :: ── Check ffmpeg ──────────────────────────────────────────
 where ffmpeg >nul 2>&1

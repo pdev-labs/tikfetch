@@ -62,7 +62,7 @@ else
 fi
 
 info "Installing browser binaries for Playwright..."
-"$PYTHON" -m playwright install --with-deps chromium
+"$PYTHON" -m playwright install chromium
 
 # ── Also check ffmpeg ─────────────────────────────────────
 if ! command -v ffmpeg &>/dev/null; then
