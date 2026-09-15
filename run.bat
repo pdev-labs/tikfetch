@@ -83,8 +83,8 @@ echo.
 
 :: Keep window open after script exits (so user can read output)
 echo.
-echo  ─────────────────────────────────────────────────────
+echo  =====================================================
 echo   Program finished. Press any key to close this window.
-echo  ─────────────────────────────────────────────────────
+echo  =====================================================
 pause >nul
 endlocal
