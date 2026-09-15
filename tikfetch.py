@@ -423,16 +423,12 @@ def download_account_videos(cfg: dict):
     cookie_opts = _get_cookie_opts(cfg)
     console.print()
 
-    show_browser = Confirm.ask(
-        "  [bold]Show automated browser?[/bold] [dim](Say yes if headless gets blocked)[/dim]", default=False
-    )
-    
     # ── Fetch video list ──────────────────────────────────────────────────────
     console.print("  [dim]Fetching video list using automated browser (this may take a moment)…[/dim]")
     
     video_urls: list[str] = []
     try:
-        video_urls = _fetch_videos_with_playwright(account_url, headless=not show_browser)
+        video_urls = _fetch_videos_with_playwright(account_url, headless=True)
     except Exception as e:
         console.print()
         error(f"Could not fetch video list: {escape(str(e))}")
