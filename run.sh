@@ -70,6 +70,7 @@ if ! command -v ffmpeg &>/dev/null; then
     warn "  Fedora        : sudo dnf install ffmpeg"
     warn "  Arch          : sudo pacman -S ffmpeg"
     warn "  macOS (brew)  : brew install ffmpeg"
+    warn "  Termux        : pkg install ffmpeg"
     echo ""
     read -rp "Press Enter to continue anyway, or Ctrl+C to abort..."
 fi

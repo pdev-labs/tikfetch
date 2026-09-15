@@ -83,6 +83,7 @@ Or simply **double-click `run.bat`**.
 | Arch Linux | `sudo pacman -S ffmpeg` |
 | macOS | `brew install ffmpeg` |
 | Windows | `winget install ffmpeg` |
+| Termux (Android) | `pkg install ffmpeg python` |
 
 ---
 
