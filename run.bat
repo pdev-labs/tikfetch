@@ -60,12 +60,9 @@ echo [INFO] Checking dependencies...
 if exist "!REQ_FILE!" (
     "!PYTHON!" -m pip install --quiet -r "!REQ_FILE!"
 ) else (
-    "!PYTHON!" -m pip install --quiet --upgrade yt-dlp rich playwright
+    "!PYTHON!" -m pip install --quiet --upgrade yt-dlp rich
 )
 echo [OK]   Dependencies ready.
-
-echo [INFO] Installing browser binaries for Playwright...
-"!PYTHON!" -m playwright install chromium
 
 :: ── Check ffmpeg ──────────────────────────────────────────
 where ffmpeg >nul 2>&1
